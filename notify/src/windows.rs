@@ -283,13 +283,16 @@ fn available_directory_reader_kind() -> DirectoryReaderKind {
     unsafe {
         let module: HMODULE = GetModuleHandleW(windows_sys::w!("kernel32.dll"));
         if module.is_null() {
+            println!("判定: DirectoryReaderKind::Standard (ReadDirectoryChangesW)");
             return DirectoryReaderKind::Standard;
         }
 
         let func_ptr = GetProcAddress(module, windows_sys::s!("ReadDirectoryChangesExW"));
         if func_ptr.is_some() {
+            println!("判定: DirectoryReaderKind::Extended (ReadDirectoryChangesExW)");
             DirectoryReaderKind::Extended
         } else {
+            println!("判定: DirectoryReaderKind::Standard (ReadDirectoryChangesW)");
             DirectoryReaderKind::Standard
         }
     }
@@ -442,8 +445,8 @@ unsafe extern "system" fn handle_extended_event(
     let mut cur_entry = ptr::read_unaligned(cur_offset as *const FILE_NOTIFY_EXTENDED_INFORMATION);
     loop {
         // filename length is size in bytes, so / 2
-        let ptr = buf.as_ptr().add(offset) as *const FILE_NOTIFY_EXTENDED_INFORMATION;
-        let file_info: &FILE_NOTIFY_EXTENDED_INFORMATION = unsafe { &*ptr };
+        // let ptr = buf.as_ptr().add(offset) as *const FILE_NOTIFY_EXTENDED_INFORMATION;
+        // let file_info: &FILE_NOTIFY_EXTENDED_INFORMATION = unsafe { &*ptr };
 
         let len = cur_entry.FileNameLength as usize / 2;
         let encoded_path: &[u16] = slice::from_raw_parts(
@@ -513,7 +516,7 @@ unsafe extern "system" fn handle_extended_event(
                     event_handler(Ok(ev));
                 }
                 FILE_ACTION_MODIFIED => {
-                    let kind = if file_info.LastChangeTime > file_info.LastModificationTime {
+                    let kind = if cur_entry.LastChangeTime > cur_entry.LastModificationTime {
                         // 属性のみ変更されたと推定
                         EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any))
                     } else {
